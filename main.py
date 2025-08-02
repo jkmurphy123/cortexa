@@ -13,6 +13,10 @@ from topic_picker import pick_topic
 
 from ui_renderer import QApplication, MainWindow
 
+class ChunkDispatcher(QObject):
+    # chunk text, and a Python object (the threading.Event) to signal completion
+    chunk_signal = pyqtSignal(str, object)
+
 # Logging setup (reuse from phase2)
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -59,10 +63,8 @@ def maybe_inject_tangent(chunk_count, drift_interval, config):
         return config.get("streaming", {}).get("tangent_prompt", "")
     return None
 
-def backend_loop(personality, topic, llm, config, window, logger, stop_event):
+def backend_loop(personality, topic, llm, config, window, logger, stop_event, dispatcher):
     streaming_cfg = config.get("streaming", {})
-    logging_cfg = config.get("logging", {})
-
     max_words = personality.get("speech_balloon", {}).get("max_words_per_chunk", streaming_cfg.get("max_words_per_chunk", 60))
     inter_chunk_pause = streaming_cfg.get("inter_chunk_pause_seconds", 2.0)
     drift_interval = streaming_cfg.get("drift_interval_chunks", 4)
@@ -75,7 +77,7 @@ def backend_loop(personality, topic, llm, config, window, logger, stop_event):
     time.sleep(streaming_cfg.get("initial_pause_seconds", 1.0))
 
     iteration = 0
-    while not stop_event.is_set() and iteration < 8:  # cap for demo; adjust as needed
+    while not stop_event.is_set() and iteration < 8:
         iteration += 1
         tangent = maybe_inject_tangent(chunk_counter, drift_interval, config)
         if tangent:
@@ -83,7 +85,7 @@ def backend_loop(personality, topic, llm, config, window, logger, stop_event):
         else:
             prompt = build_prompt(personality, topic, history, config)
 
-        if logging_cfg.get("include_full_prompts", False):
+        if config.get("logging", {}).get("include_full_prompts", False):
             logger.debug(f"Prompt iteration {iteration}:\n{prompt}")
 
         raw_output = llm.generate(prompt)
@@ -93,26 +95,14 @@ def backend_loop(personality, topic, llm, config, window, logger, stop_event):
 
         for chunk in chunk_text(raw_output, max_words):
             chunk_counter += 1
-            # Use Qt main thread to update UI via signal-like scheduling
             done = threading.Event()
-
-            def on_complete():
-                done.set()
-
-            # Need to schedule UI update in Qt thread
-            def dispatch_chunk():
-                window.display_chunk_with_typing(chunk, inter_chunk_pause, on_complete=on_complete)
-
-            QApplication.instance().postEvent(window, type("Dummy", (), {})())  # trivial to force event loop
-            # Direct call is okay because we’re in separate thread and the method schedules timers internally
-            window.display_chunk_with_typing(chunk, inter_chunk_pause, on_complete=on_complete)
-
+            # emit into main thread; handler will call display_chunk_with_typing and set done when finished
+            dispatcher.chunk_signal.emit(chunk, done)
             logger.info(f"Chunk {chunk_counter}: {chunk}")
-            # maintain history
             history.append(chunk)
             if len(history) > max_history:
                 history = history[-max_history:]
-            # wait until typing finishes before sleeping
+            # wait for the UI typing animation to complete
             done.wait()
             time.sleep(inter_chunk_pause)
 
@@ -148,6 +138,16 @@ def main():
         max_tokens=256,
     )
 
+    dispatcher = ChunkDispatcher()
+
+    def handle_chunk(chunk, done_event):
+        def on_complete():
+            done_event.set()
+        # Assuming inter_chunk_pause is available in this scope or pass it in as needed
+        window.display_chunk_with_typing(chunk, config["streaming"].get("inter_chunk_pause_seconds", 2.0), on_complete=on_complete)
+
+    dispatcher.chunk_signal.connect(handle_chunk)
+
     app = QApplication(sys.argv)
     window = MainWindow(personality, topic)
     window.show()
@@ -155,7 +155,7 @@ def main():
     stop_event = threading.Event()
     backend_thread = threading.Thread(
         target=backend_loop,
-        args=(personality, topic, llm, config, window, logger, stop_event),
+        args=(personality, topic, llm, config, window, logger, stop_event, dispatcher),
         daemon=True,
     )
     backend_thread.start()
