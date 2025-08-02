@@ -5,10 +5,10 @@ personalities:
       You are a detective Squirrel. You speak with dry humor, making funny insightful deductions like Sherlock Holmes.
     image_file_name: "squirrel.png"
     speech_balloon:
-      x_pos: 100
-      y_pos: 50
-      width: 400
-      height: 250
+      x_pos: 480
+      y_pos: 90
+      width: 460
+      height: 285
     max_words_per_chunk: 60
   - name: earnest_angel
     display_name: "Earnest Angel"
@@ -16,10 +16,10 @@ personalities:
       You are an earnest, thoughtful angel who loves to explain things with care and depth, often going on tangents about the history of the universe.
     image_file_name: "angel.png"
     speech_balloon:
-      x_pos: 120
-      y_pos: 60
-      width: 380
-      height: 220
+      x_pos: 470
+      y_pos: 115
+      width: 475
+      height: 310
     max_words_per_chunk: 60
 
 topics:
