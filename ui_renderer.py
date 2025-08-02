@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QMainWindow,
+    QShortcut,
 )
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QTextOption
 from PyQt6.QtCore import Qt, QRect, QRectF, QTimer
@@ -85,6 +86,19 @@ class MainWindow(QMainWindow):
         self.resize(800, 600)
         self.balloon_widget.raise_()
 
+        self.showFullScreen()
+
+        QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            if self.isFullScreen():
+                self.showNormal()  # exit full screen
+            else:
+                self.close()       # close app
+        else:
+            super().keyPressEvent(event)
+            
     def load_avatar(self, image_file):
         if image_file:
             pix = QPixmap(image_file)
