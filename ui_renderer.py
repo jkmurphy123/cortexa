@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
 )
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QTextOption
-from PyQt6.QtCore import Qt, QRect, QTimer
+from PyQt6.QtCore import Qt, QRect, QRectF, QTimer
 
 class SpeechBalloonWidget(QWidget):
     def __init__(self, balloon_spec, parent=None):
@@ -47,7 +47,6 @@ class SpeechBalloonWidget(QWidget):
         option = QTextOption()
         option.setWrapMode(QTextOption.WrapMode.WordWrap)
 
-        # convert to QRectF so the overload with QTextOption is used
         painter.drawText(QRectF(inner), self.text, option)
 
 
