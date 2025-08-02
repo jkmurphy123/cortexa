@@ -1,2 +1,3 @@
-pyyaml
-llama-cpp-python  # optional: only if you have built/installed llama.cpp and want real inference
+PyYAML
+llama-cpp-python      # if you want real LLM; otherwise fallback stub in llm_interface.py still works
+PyQt6

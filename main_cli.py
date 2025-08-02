@@ -98,7 +98,7 @@ def main():
 
     # Stream out the first response in chunks
     for chunk in chunk_text(output, max_words_per_chunk):
-        print(chunk)
+        #print(chunk)
         time.sleep(inter_chunk_pause)
     last_fragment = output  # naive: use entire output for continuation context
 
@@ -109,7 +109,7 @@ def main():
         time.sleep(inter_chunk_pause)
         output = llm.generate(continuation_prompt, temperature=temperature, top_p=top_p)
         for chunk in chunk_text(output, max_words_per_chunk):
-            print(chunk)
+            #print(chunk)
             time.sleep(inter_chunk_pause)
         last_fragment = output  # in a real system you'd manage rolling context more carefully
 
