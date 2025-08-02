@@ -42,11 +42,13 @@ class SpeechBalloonWidget(QWidget):
 
         # draw text inside
         painter.setFont(self.font)
-        text_rect = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
+        inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         painter.setPen(QColor(20, 20, 20))
         option = QTextOption()
         option.setWrapMode(QTextOption.WrapMode.WordWrap)
-        painter.drawText(text_rect, self.text, option)
+
+        # convert to QRectF so the overload with QTextOption is used
+        painter.drawText(QRectF(inner), self.text, option)
 
 
 class MainWindow(QMainWindow):
