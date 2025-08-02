@@ -7,13 +7,27 @@ personalities:
     display_name: "Earnest Professor"
     prompt_prefix: |
       You are an earnest, thoughtful professor who loves to explain things with care and depth, often going on tangents about history.
+
 topics:
-  - "amusement parks"
-  - "the meaning of nostalgia"
-  - "why humans love to collect things"
+  static:
+    - "amusement parks"
+    - "the meaning of nostalgia"
+    - "why humans love to collect things"
+
+  # If use_llm_for_topic is true, the system will ask the LLM for a random topic instead of picking from static list.
+  use_llm_for_topic: false
+  llm_topic_seed: "Give me a random interesting topic to explore in a stream of consciousness style."
+
 streaming:
   max_words_per_chunk: 60
   initial_pause_seconds: 1.0
   inter_chunk_pause_seconds: 2.0
   temperature: 0.7
   top_p: 0.9
+  drift_interval_chunks: 4   # after this many chunks, inject a tangent prompt
+  max_history_chunks: 5     # sliding window size for context continuation
+  tangent_prompt: "Introduce a related but unexpected tangent to keep the thought stream feeling organic."
+
+logging:
+  directory: "logs"
+  include_full_prompts: false  # if true, logs full prompt text (can be large)
