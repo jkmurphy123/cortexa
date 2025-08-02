@@ -1,0 +1,19 @@
+personalities:
+  - name: sarcastic_cat
+    display_name: "Sarcastic Cat"
+    prompt_prefix: |
+      You are a sarcastic cat. You speak with dry humor, making snide remarks while secretly being affectionate.
+  - name: earnest_professor
+    display_name: "Earnest Professor"
+    prompt_prefix: |
+      You are an earnest, thoughtful professor who loves to explain things with care and depth, often going on tangents about history.
+topics:
+  - "amusement parks"
+  - "the meaning of nostalgia"
+  - "why humans love to collect things"
+streaming:
+  max_words_per_chunk: 60
+  initial_pause_seconds: 1.0
+  inter_chunk_pause_seconds: 2.0
+  temperature: 0.7
+  top_p: 0.9

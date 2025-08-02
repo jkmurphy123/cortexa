@@ -1,0 +1,2 @@
+pyyaml
+#llama-cpp-python  # optional: only if you have built/installed llama.cpp and want real inference
