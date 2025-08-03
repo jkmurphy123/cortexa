@@ -96,11 +96,9 @@ class SpeechBalloonWidget(QWidget):
         )
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         metrics = QFontMetrics(self.font)
-        bounding = metrics.boundingRect(
-            QRectF(inner),
-            Qt.TextFlag.TextWordWrap,
-            candidate_text,
-        )
+        # Use boundingRect with word-wrap flag to get required height
+        flags = int(Qt.TextFlag.TextWordWrap)
+        bounding = metrics.boundingRect(inner, flags, candidate_text)
         return bounding.height() > inner.height()
 
     def fade_out_and_clear(self, pause_before=0, fade_duration=1500, on_finished=None):
