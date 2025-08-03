@@ -1,6 +1,7 @@
 import os
 import time
 import random
+import re
 from datetime import datetime
 
 try:
@@ -8,6 +9,17 @@ try:
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
+
+def sanitize_output(text: str) -> str:
+    # Remove OpenAI-style role markers or custom tokens
+    text = re.sub(r"<\|im_(?:start|end)\|>", "", text)
+    text = re.sub(r"<\|im_start\|assistant>", "", text)
+    text = re.sub(r"<\|im_end\|>", "", text)
+    # Remove that specific boilerplate if present
+    boilerplate = "Make sure to keep the flow of the conversation flowing smoothly and to the point."
+    text = re.sub(re.escape(boilerplate), "", text, flags=re.IGNORECASE)
+    # Collapse repeated whitespace and trim
+    return text.strip()
 
 def dummy_generate(prompt, temperature=0.7, top_p=0.9, max_tokens=256):
     filler = (
@@ -38,6 +50,7 @@ class LLMPipeline:
                 max_tokens=self.max_tokens,
                 stop=None,
             )
-            return resp.get("choices", [{}])[0].get("text", "").strip()
+            raw = resp.get("choices", [{}])[0].get("text", "")
         else:
-            return dummy_generate(prompt, temperature=self.temperature, top_p=self.top_p)
+            raw = dummy_generate(prompt, temperature=self.temperature, top_p=self.top_p, max_tokens=self.max_tokens)
+        return sanitize_output(raw)

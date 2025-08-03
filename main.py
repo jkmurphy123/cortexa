@@ -6,7 +6,7 @@ import os
 import logging
 import threading
 import sys
-
+import re
 from datetime import datetime
 
 from llm_interface import LLMPipeline
@@ -18,6 +18,47 @@ from PyQt6.QtCore import QObject, pyqtSignal
 # Signal dispatcher to marshal chunks into the GUI thread
 class ChunkDispatcher(QObject):
     chunk_signal = pyqtSignal(str, object)  # chunk text, threading.Event to signal completion
+
+_sentence_splitter = re.compile(r'(?<=[.!?])\s+')
+
+def chunk_by_sentence(text: str, max_words: int):
+    """
+    Yield chunks of text that end on sentence boundaries without exceeding max_words.
+    If a single sentence is longer than max_words, fallback to word-level slicing for that sentence.
+    """
+    sentences = _sentence_splitter.split(text.strip())
+    current_chunk = []
+    current_count = 0
+
+    def yield_current():
+        if current_chunk:
+            yield " ".join(current_chunk).strip()
+
+    for sentence in sentences:
+        words_in_sentence = sentence.split()
+        if not words_in_sentence:
+            continue
+        if current_count + len(words_in_sentence) <= max_words:
+            current_chunk.append(sentence)
+            current_count += len(words_in_sentence)
+        else:
+            # flush existing
+            yield from yield_current()
+            current_chunk = []
+            current_count = 0
+            if len(words_in_sentence) <= max_words:
+                current_chunk = [sentence]
+                current_count = len(words_in_sentence)
+            else:
+                # sentence itself too big: break it
+                words = words_in_sentence
+                for i in range(0, len(words), max_words):
+                    part = " ".join(words[i : i + max_words])
+                    yield part.strip()
+                # leave current empty
+                current_chunk = []
+                current_count = 0
+    yield from yield_current()
 
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -39,11 +80,6 @@ def setup_logger(log_dir):
     ch.setFormatter(fmt)
     logger.addHandler(ch)
     return logger
-
-def chunk_text(text, max_words):
-    words = text.split()
-    for i in range(0, len(words), max_words):
-        yield " ".join(words[i : i + max_words])
 
 def build_prompt(personality, topic, history_chunks, config):
     prefix = personality.get("prompt_prefix", "").strip()
@@ -96,7 +132,7 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
             logger.warning("Empty LLM output; skipping iteration.")
             continue
 
-        for chunk in chunk_text(raw_output, max_words):
+        for chunk in chunk_by_sentence(raw_output, max_words):
             chunk_counter += 1
             done = threading.Event()
             dispatcher.chunk_signal.emit(chunk, done)
@@ -142,11 +178,11 @@ def main():
         max_tokens=256,
     )
 
-    app = QApplication(sys.argv)
     screen_width = config.get("screen_width", 1024)
     screen_height = config.get("screen_height", 768)
     images_dir = config.get("ui", {}).get("images_dir", "ui/images")
 
+    app = QApplication(sys.argv)
     window = MainWindow(personality, topic, images_dir=images_dir, screen_width=screen_width, screen_height=screen_height)
     window.showFullScreen()
 
@@ -156,7 +192,6 @@ def main():
     def handle_chunk(chunk, done_event):
         def on_complete():
             done_event.set()
-        # Use display with typing; this runs in GUI thread because signal-slot
         inter_chunk_pause = config.get("streaming", {}).get("inter_chunk_pause_seconds", 2.0)
         window.display_chunk_with_typing(chunk, inter_chunk_pause, on_complete=on_complete)
 
