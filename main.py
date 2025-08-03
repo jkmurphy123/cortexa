@@ -166,7 +166,10 @@ def main():
         top_p=config.get("streaming", {}).get("top_p", 0.9),
         max_tokens=128,
     )
-    topic = pick_topic(config, topic_picker_llm)
+    # use the new LLM-only topic picker
+    from topic_picker import pick_topic_via_llm
+    topic = pick_topic_via_llm(config, topic_picker_llm)
+    logger.info(f"Selected topic via LLM: {topic}")
 
     logger = setup_logger(config.get("logging", {}).get("directory", "logs"))
     logger.info(f"Chosen personality: {personality.get('display_name')} topic: {topic}")

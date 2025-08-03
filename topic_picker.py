@@ -1,19 +1,28 @@
-import random
+import re
 
-def pick_static_topic(config):
-    static_list = config.get("topics", {}).get("static", [])
-    if not static_list:
-        raise ValueError("No static topics defined in config.")
-    return random.choice(static_list)
+def pick_topic_via_llm(config, llm_pipeline):
+    """
+    Always uses the LLM to generate a topic based on the seed prompt.
+    Falls back to a safe default if generation fails or is empty.
+    """
+    seed = config.get("topics", {}).get(
+        "llm_topic_seed",
+        "Give me a random topic to explore in a stream of consciousness style. Respond with just the topic phrase."
+    )
+    prompt = f"{seed}\n\nRespond with a concise topic phrase only."
+    raw = llm_pipeline.generate(prompt)
+    topic = sanitize_topic(raw)
+    if not topic:
+        # fallback
+        return "the meaning of nostalgia"
+    return topic
 
-def pick_topic(config, llm_pipeline):
-    use_llm = config.get("topics", {}).get("use_llm_for_topic", False)
-    if use_llm:
-        seed = config.get("topics", {}).get("llm_topic_seed", "Give me a random topic.")
-        prompt = f"{seed}\n\nRespond with a concise topic phrase only."
-        raw = llm_pipeline.generate(prompt)
-        # Simple sanitization: take first line, strip punctuation if excessive
-        topic = raw.strip().split("\n")[0]
-        return topic
-    else:
-        return pick_static_topic(config)
+def sanitize_topic(raw: str) -> str:
+    # Take first line, strip extraneous punctuation/spaces
+    line = raw.strip().splitlines()[0]
+    # Remove surrounding quotes if present
+    line = re.sub(r'^["\']+|["\']+$', '', line).strip()
+    # Optionally truncate to reasonable length
+    if len(line) > 100:
+        line = line[:100].rsplit(" ", 1)[0]
+    return line

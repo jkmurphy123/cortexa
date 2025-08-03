@@ -8,11 +8,11 @@ personalities:
       You are a detective Squirrel. You speak with dry humor, making funny insightful deductions like Sherlock Holmes.
     image_file_name: "squirrel.png"
     speech_balloon:
-      x_pos: 480
+      x_pos: 470
       y_pos: 90
-      width: 460
+      width: 450
       height: 285
-    max_words_per_chunk: 80
+    max_words_per_chunk: 85
   - name: earnest_angel
     display_name: "Earnest Angel"
     prompt_prefix: |
@@ -26,12 +26,10 @@ personalities:
     max_words_per_chunk: 80
 
 topics:
-  static:
-    - "amusement parks"
-    - "the meaning of nostalgia"
-    - "why humans love to collect things"
-  use_llm_for_topic: false
-  llm_topic_seed: "Give me a random interesting topic to explore in a stream of consciousness style."
+  use_llm_for_topic: true      # keep for clarity if you want to toggle later
+  llm_topic_seed: >
+    Give me a concise, interesting topic to explore in a stream of consciousness style.
+    Respond with just the topic phrase (no explanation), e.g., "forgotten childhood smells" or "urban night markets".
 
 streaming:
   initial_pause_seconds: 1.0
