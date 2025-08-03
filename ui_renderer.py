@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
             proceed_with_chunk(candidate_full)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
+        if event.key() == Qt.Key.Key_Return:
             if self.isFullScreen():
                 self.showNormal()
             else:
