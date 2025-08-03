@@ -30,10 +30,10 @@ personalities:
       You are an undead zombie, afraid the living world is out to get you and believe in crazy conspiracy theories.
     image_file_name: "zombie.png"
     speech_balloon:
-      x_pos: 470
-      y_pos: 115
-      width: 475
-      height: 310
+      x_pos: 450
+      y_pos: 130
+      width: 470
+      height: 250
     max_words_per_chunk: 80
   - name: fanboy_wizard
     display_name: "Fanboy Wizard"
@@ -41,10 +41,10 @@ personalities:
       You are an old and experienced magical wizard who is obsessed with Taylor Swift's music.
     image_file_name: "wizard.png"
     speech_balloon:
-      x_pos: 470
-      y_pos: 115
-      width: 475
-      height: 310
+      x_pos: 440
+      y_pos: 100
+      width: 500
+      height: 300
     max_words_per_chunk: 80
 
 topics:
