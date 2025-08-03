@@ -157,12 +157,9 @@ class MainWindow(QMainWindow):
         balloon_w = spec.get("width", 400)
         balloon_h = spec.get("height", 250)
         self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
-        #self.balloon_widget.setFixedSize(balloon_w + 16, balloon_h + 16)
-        #self.layout.addWidget(self.balloon_widget, stretch=1)
-        self.balloon_widget.setParent(self)
-        self.balloon_widget.move(spec.get("x_pos", 100), spec.get("y_pos", 50))
-        self.balloon_widget.setFixedSize(balloon_w, balloon_h)
-        self.balloon_widget.show()
+        self.balloon_widget.setFixedSize(balloon_w + 260, balloon_h + 260)  #temp
+        self.balloon_widget.setStyleSheet("border: 2px solid red;")  #temp
+        self.layout.addWidget(self.balloon_widget, stretch=1)
 
         # Typing indicator
         self.typing_label = QLabel("")
