@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 from llm_interface import LLMPipeline
-
+from topic_picker import pick_topic_via_llm
 from ui_renderer import QApplication, MainWindow
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -18,6 +18,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 class ChunkDispatcher(QObject):
     chunk_signal = pyqtSignal(str, object)  # chunk text, threading.Event to signal completion
 
+# Sentence-aware chunking
 _sentence_splitter = re.compile(r'(?<=[.!?])\s+')
 
 def chunk_by_sentence(text: str, max_words: int):
@@ -48,7 +49,7 @@ def chunk_by_sentence(text: str, max_words: int):
                 current_chunk = [sentence]
                 current_count = len(words_in_sentence)
             else:
-                # sentence itself too big: break it into word chunks
+                # sentence too big; break into word chunks
                 words = words_in_sentence
                 for i in range(0, len(words), max_words):
                     part = " ".join(words[i : i + max_words])
@@ -57,12 +58,8 @@ def chunk_by_sentence(text: str, max_words: int):
                 current_count = 0
     yield from yield_current()
 
-
+# Topic generation via LLM
 def pick_topic_via_llm(config, llm_pipeline):
-    """
-    Always uses the LLM to generate a topic based on the seed prompt.
-    Falls back to a default if generation fails.
-    """
     seed = config.get("topics", {}).get(
         "llm_topic_seed",
         "Give me a concise, interesting topic to explore in a stream of consciousness style. Respond with just the topic phrase."
@@ -75,18 +72,16 @@ def pick_topic_via_llm(config, llm_pipeline):
     return topic
 
 def sanitize_topic(raw: str) -> str:
-    # Take first non-empty line
     lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
     if not lines:
         return ""
     line = lines[0]
-    # Strip surrounding quotes
     line = re.sub(r'^["\']+|["\']+$', '', line).strip()
-    # Truncate if too long
     if len(line) > 100:
         line = line[:100].rsplit(" ", 1)[0]
     return line
 
+# Config / logging helpers
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -108,6 +103,7 @@ def setup_logger(log_dir):
     logger.addHandler(ch)
     return logger
 
+# Prompt construction
 def build_prompt(personality, topic, history_chunks, config):
     prefix = personality.get("prompt_prefix", "").strip()
     base = f"{prefix}\n\nTopic: {topic}\n\n"
@@ -127,6 +123,7 @@ def maybe_inject_tangent(chunk_count, drift_interval, config):
         return config.get("streaming", {}).get("tangent_prompt", "")
     return None
 
+# Backend generation loop
 def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher):
     streaming_cfg = config.get("streaming", {})
     logging_cfg = config.get("logging", {})
@@ -143,7 +140,7 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
     time.sleep(streaming_cfg.get("initial_pause_seconds", 1.0))
 
     iteration = 0
-    while not stop_event.is_set() and iteration < 8:  # adjust cap as desired
+    while not stop_event.is_set() and iteration < 8:  # adjust as needed
         iteration += 1
         tangent = maybe_inject_tangent(chunk_counter, drift_interval, config)
         if tangent:
@@ -165,11 +162,9 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
             dispatcher.chunk_signal.emit(chunk, done)
             logger.info(f"Chunk {chunk_counter}: {chunk}")
 
-            # update history window
             history.append(chunk)
             if len(history) > max_history:
                 history = history[-max_history:]
-            # wait for UI typing to finish before continuing
             done.wait()
             time.sleep(inter_chunk_pause)
 
@@ -188,10 +183,10 @@ def main():
 
     personality = random.choice(personalities)
 
-    # LLM to generate topic
+    # Generate topic via LLM
     topic_picker_llm = LLMPipeline(
         model_path=args.model,
-        temperature=config.get("streaming", {}).get("temperature", 0.8),  # slightly higher diversity for topic
+        temperature=config.get("streaming", {}).get("temperature", 0.8),
         top_p=config.get("streaming", {}).get("top_p", 0.9),
         max_tokens=64,
     )
@@ -200,7 +195,7 @@ def main():
     logger = setup_logger(config.get("logging", {}).get("directory", "logs"))
     logger.info(f"Chosen personality: {personality.get('display_name')} topic: {topic}")
 
-    # Main generation LLM
+    # Main LLM for stream
     llm = LLMPipeline(
         model_path=args.model,
         temperature=config.get("streaming", {}).get("temperature", 0.7),
@@ -222,7 +217,6 @@ def main():
     )
     window.showFullScreen()
 
-    # Dispatcher and slot
     dispatcher = ChunkDispatcher()
 
     def handle_chunk(chunk, done_event):
