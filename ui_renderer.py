@@ -225,6 +225,8 @@ class MainWindow(QMainWindow):
                     self.typing_label.setText("")
                     full_text = " ".join(displayed)
                     self.balloon_widget.set_text(full_text)
+                    self.balloon_widget.raise_()
+                    self.balloon_widget.update()
                     if on_complete:
                         on_complete()
                     return
