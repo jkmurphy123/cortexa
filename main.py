@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 from llm_interface import LLMPipeline
-from topic_picker import pick_topic_via_llm
+from topic_picker import pick_static_topic
 
 from ui_renderer import QApplication, MainWindow
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -151,13 +151,14 @@ def main():
 
     personality = random.choice(personalities)
 
-    topic_picker_llm = LLMPipeline(
-        model_path=args.model,
-        temperature=config.get("streaming", {}).get("temperature", 0.8),
-        top_p=config.get("streaming", {}).get("top_p", 0.9),
-        max_tokens=64,
-    )
-    topic = pick_topic_via_llm(config, topic_picker_llm)
+    # topic_picker_llm = LLMPipeline(
+    #     model_path=args.model,
+    #     temperature=config.get("streaming", {}).get("temperature", 0.8),
+    #     top_p=config.get("streaming", {}).get("top_p", 0.9),
+    #     max_tokens=64,
+    # )
+    # topic = pick_topic_via_llm(config, topic_picker_llm)
+    topic = pick_static_topic(config)
 
     logger = setup_logger(config.get("logging", {}).get("directory", "logs"))
     logger.info(f"Chosen personality: {personality.get('display_name')} topic: {topic}")

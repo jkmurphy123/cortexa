@@ -48,10 +48,32 @@ personalities:
     max_words_per_chunk: 80
 
 topics:
-  use_llm_for_topic: true      # keep for clarity if you want to toggle later
+  use_llm_for_topic: false     # set true if you ever want to switch back to LLM-generated
+  static:
+    - "What does it mean to truly know someone—can you ever fully understand another mind?"
+    - "If memories can be altered or erased, who are you without them?"
+    - "Is morality objective, or just a consensus story we tell to stay cohesive?"
+    - "Do choices define us, or are we defined by the circumstances that shaped those choices?"
+    - "Could consciousness be an emergent illusion—something we feel but that has no fundamental “self”?"
+    - "If time isn’t linear, how would that change how we live and regret?"
+    - "Are there limits to empathy, and if so, where do they come from?"
+    - "What responsibility do we owe future generations for problems they didn’t create?"
+    - "Is suffering necessary for meaning, or can meaning exist in a painless existence?"
+    - "If you could upload your mind, would “you” still be you afterward?"
+    - "Do parallel universes contain versions of us making different moral choices—and does that absolve or burden us?"
+    - "What’s the difference between truth and narrative, and who gets to tell which is which?"
+    - "Can love be reduced to chemistry, or is there something irreducible about it?"
+    - "If AI becomes indistinguishable from human thought, does it deserve rights or recognition?"
+    - "Is the search for purpose a human-made void we’re trying to fill, or an intrinsic feature of existence?"
+    - "How much of your identity is performance versus authentic self?"
+    - "Are we responsible for the unintended consequences of our curiosity?"
+    - "Does the universe have intrinsic meaning, or is meaning something we project onto it?"
+    - "If you could know the exact moment and manner of your death, would you want to?"
+    - "Is forgiveness for others more about them, or about freeing yourself?"
+
   llm_topic_seed: >
     Give me a concise, interesting topic to explore in a stream of consciousness style.
-    Respond with just the topic phrase (no explanation), e.g., "forgotten childhood smells" or "urban night markets".
+    Respond with just the topic phrase only.
 
 streaming:
   initial_pause_seconds: 1.0
