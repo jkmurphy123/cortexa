@@ -11,6 +11,7 @@ from datetime import datetime
 
 from llm_interface import LLMPipeline
 from topic_picker import pick_topic_via_llm
+
 from ui_renderer import QApplication, MainWindow
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -18,14 +19,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 class ChunkDispatcher(QObject):
     chunk_signal = pyqtSignal(str, object)  # chunk text, threading.Event to signal completion
 
-# Sentence-aware chunking
 _sentence_splitter = re.compile(r'(?<=[.!?])\s+')
 
 def chunk_by_sentence(text: str, max_words: int):
-    """
-    Yield chunks of text that end on sentence boundaries without exceeding max_words.
-    If a single sentence is longer than max_words, fallback to word-level slicing for that sentence.
-    """
     sentences = _sentence_splitter.split(text.strip())
     current_chunk = []
     current_count = 0
@@ -49,26 +45,13 @@ def chunk_by_sentence(text: str, max_words: int):
                 current_chunk = [sentence]
                 current_count = len(words_in_sentence)
             else:
-                # sentence too big; break into word chunks
-                words = words_in_sentence
-                for i in range(0, len(words), max_words):
-                    part = " ".join(words[i : i + max_words])
+                for i in range(0, len(words_in_sentence), max_words):
+                    part = " ".join(words_in_sentence[i : i + max_words])
                     yield part.strip()
                 current_chunk = []
                 current_count = 0
     yield from yield_current()
 
-def sanitize_topic(raw: str) -> str:
-    lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
-    if not lines:
-        return ""
-    line = lines[0]
-    line = re.sub(r'^["\']+|["\']+$', '', line).strip()
-    if len(line) > 100:
-        line = line[:100].rsplit(" ", 1)[0]
-    return line
-
-# Config / logging helpers
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -90,7 +73,6 @@ def setup_logger(log_dir):
     logger.addHandler(ch)
     return logger
 
-# Prompt construction
 def build_prompt(personality, topic, history_chunks, config):
     prefix = personality.get("prompt_prefix", "").strip()
     base = f"{prefix}\n\nTopic: {topic}\n\n"
@@ -110,7 +92,6 @@ def maybe_inject_tangent(chunk_count, drift_interval, config):
         return config.get("streaming", {}).get("tangent_prompt", "")
     return None
 
-# Backend generation loop
 def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher):
     streaming_cfg = config.get("streaming", {})
     logging_cfg = config.get("logging", {})
@@ -127,7 +108,7 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
     time.sleep(streaming_cfg.get("initial_pause_seconds", 1.0))
 
     iteration = 0
-    while not stop_event.is_set() and iteration < 8:  # adjust as needed
+    while not stop_event.is_set() and iteration < 8:
         iteration += 1
         tangent = maybe_inject_tangent(chunk_counter, drift_interval, config)
         if tangent:
@@ -170,7 +151,6 @@ def main():
 
     personality = random.choice(personalities)
 
-    # Generate topic via LLM
     topic_picker_llm = LLMPipeline(
         model_path=args.model,
         temperature=config.get("streaming", {}).get("temperature", 0.8),
@@ -182,7 +162,6 @@ def main():
     logger = setup_logger(config.get("logging", {}).get("directory", "logs"))
     logger.info(f"Chosen personality: {personality.get('display_name')} topic: {topic}")
 
-    # Main LLM for stream
     llm = LLMPipeline(
         model_path=args.model,
         temperature=config.get("streaming", {}).get("temperature", 0.7),
