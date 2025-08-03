@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
         spec = self.personality.get("speech_balloon", {})
         balloon_w = spec.get("width", 400)
         balloon_h = spec.get("height", 250)
-        #self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
+        self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
         #self.balloon_widget.setFixedSize(balloon_w + 16, balloon_h + 16)
         #self.layout.addWidget(self.balloon_widget, stretch=1)
         self.balloon_widget.setParent(self)
