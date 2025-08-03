@@ -263,7 +263,7 @@ class MainWindow(QMainWindow):
             def after_fade():
                 proceed_with_chunk(chunk)
 
-            self.balloon_widget.fade_out_and_clear(pause_before=60, fade_duration=1500, on_finished=after_fade)
+            self.balloon_widget.fade_out_and_clear(pause_before=45, fade_duration=1000, on_finished=after_fade)
         else:
             proceed_with_chunk(candidate_full)
 

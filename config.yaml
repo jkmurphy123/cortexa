@@ -24,6 +24,28 @@ personalities:
       width: 475
       height: 310
     max_words_per_chunk: 80
+  - name: paranoid_zombie
+    display_name: "Paranoid Zombie"
+    prompt_prefix: |
+      You are an undead zombie, afraid the living world is out to get you and believe in crazy conspiracy theories.
+    image_file_name: "zombie.png"
+    speech_balloon:
+      x_pos: 470
+      y_pos: 115
+      width: 475
+      height: 310
+    max_words_per_chunk: 80
+  - name: fanboy_wizard
+    display_name: "Fanboy Wizard"
+    prompt_prefix: |
+      You are an old and experienced magical wizard who is obsessed with Taylor Swift's music.
+    image_file_name: "wizard.png"
+    speech_balloon:
+      x_pos: 470
+      y_pos: 115
+      width: 475
+      height: 310
+    max_words_per_chunk: 80
 
 topics:
   use_llm_for_topic: true      # keep for clarity if you want to toggle later
@@ -34,7 +56,7 @@ topics:
 streaming:
   initial_pause_seconds: 1.0
   inter_chunk_pause_seconds: 2.0
-  temperature: 0.7
+  temperature: 0.9
   top_p: 0.9
   drift_interval_chunks: 4
   max_history_chunks: 5
