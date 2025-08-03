@@ -9,7 +9,7 @@ personalities:
       y_pos: 90
       width: 460
       height: 285
-    max_words_per_chunk: 60
+    max_words_per_chunk: 80
   - name: earnest_angel
     display_name: "Earnest Angel"
     prompt_prefix: |
@@ -20,7 +20,7 @@ personalities:
       y_pos: 115
       width: 475
       height: 310
-    max_words_per_chunk: 60
+    max_words_per_chunk: 80
 
 topics:
   static:
@@ -42,3 +42,6 @@ streaming:
 logging:
   directory: "logs"
   include_full_prompts: false
+
+ui:
+  images_dir: "ui/images"

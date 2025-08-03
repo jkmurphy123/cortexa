@@ -1,3 +1,4 @@
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -31,10 +32,10 @@ class SpeechBalloonWidget(QWidget):
 
         # draw balloon background
         rect = QRect(
-            self.balloon_spec["x_pos"],
-            self.balloon_spec["y_pos"],
-            self.balloon_spec["width"],
-            self.balloon_spec["height"],
+            self.balloon_spec.get("x_pos", 100),
+            self.balloon_spec.get("y_pos", 50),
+            self.balloon_spec.get("width", 400),
+            self.balloon_spec.get("height", 250),
         )
         painter.setBrush(QColor(255, 255, 255, 230))
         painter.setPen(QColor(50, 50, 50))
@@ -51,12 +52,13 @@ class SpeechBalloonWidget(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, personality, topic, on_ready_callback=None):
+    def __init__(self, personality, topic, images_dir=None, on_ready_callback=None):
         super().__init__()
         self.setWindowTitle("Personality Streamer")
         self.personality = personality
         self.topic = topic
         self.on_ready_callback = on_ready_callback
+        self.images_dir = Path(images_dir) if images_dir else None
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -70,8 +72,7 @@ class MainWindow(QMainWindow):
 
         # Speech balloon overlay
         self.balloon_widget = SpeechBalloonWidget(personality.get("speech_balloon", {}), parent=self)
-        # Make sure balloon covers window so paintEvent draws in correct coordinates
-        self.balloon_widget.setFixedSize(1000, 800)  # large enough; window resizing updates below
+        self.balloon_widget.setFixedSize(1000, 800)
         self.layout.addWidget(self.balloon_widget, stretch=1)
 
         # Typing indicator
@@ -87,15 +88,40 @@ class MainWindow(QMainWindow):
         self.balloon_widget.raise_()
 
     def load_avatar(self, image_file):
-        if image_file:
-            pix = QPixmap(image_file)
-            if not pix.isNull():
-                scaled = pix.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                self.avatar_label.setPixmap(scaled)
-            else:
-                self.avatar_label.setText(f"[Avatar missing: {image_file}]")
-        else:
+        if not image_file:
             self.avatar_label.setText("[No avatar specified]")
+            return
+
+        candidates = []
+        img_path = Path(image_file)
+        # Absolute path priority
+        if img_path.is_absolute():
+            candidates.append(img_path)
+        else:
+            # raw relative
+            candidates.append(Path(image_file))
+            # from configured images_dir (relative to cwd)
+            if self.images_dir:
+                candidates.append(self.images_dir / image_file)
+            # from images_dir relative to this module file (in case config path is relative to code)
+            base_dir = Path(__file__).resolve().parent
+            if self.images_dir:
+                candidates.append(base_dir / self.images_dir / image_file)
+
+        pix = None
+        found_path = None
+        for p in candidates:
+            if p.exists():
+                pix = QPixmap(str(p))
+                found_path = p
+                break
+
+        if pix and not pix.isNull():
+            scaled = pix.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.avatar_label.setPixmap(scaled)
+        else:
+            tried = ", ".join(str(p) for p in candidates)
+            self.avatar_label.setText(f"[Avatar missing: {image_file}]\nTried: {tried}")
 
     def display_chunk_with_typing(self, chunk, inter_chunk_pause, on_complete=None):
         words = chunk.split()
@@ -115,18 +141,16 @@ class MainWindow(QMainWindow):
             displayed.append(words[index])
             self.balloon_widget.set_text(" ".join(displayed))
             index += 1
-            QTimer.singleShot(50, step)  # 50ms per word; adjust for speed
+            QTimer.singleShot(50, step)
 
         step()
 
     def keyPressEvent(self, event):
-        # Esc: exit fullscreen or close
         if event.key() == Qt.Key.Key_Escape:
             if self.isFullScreen():
                 self.showNormal()
             else:
                 self.close()
-        # Ctrl+Q: quit
         elif event.key() == Qt.Key.Key_Q and event.modifiers() & Qt.KeyboardModifier.Control:
             self.close()
         else:
