@@ -25,7 +25,7 @@ class SpeechBalloonWidget(QWidget):
         self.balloon_spec = balloon_spec or {}
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
-        self.font = QFont("Sans Serif", 15)
+        self.font = QFont("Sans Serif", 14)
         self.padding = 8
 
         # Text label overlayed inside the balloon
@@ -71,7 +71,6 @@ class SpeechBalloonWidget(QWidget):
         )
         painter.setBrush(QColor(255, 255, 255, 230))
         painter.setPen(QColor(50, 50, 50))
-        #painter.drawRoundedRect(rect, 12, 12)
 
         # Ensure label is positioned correctly inside balloon
         self.update_label_geometry()
@@ -101,7 +100,7 @@ class SpeechBalloonWidget(QWidget):
         bounding = metrics.boundingRect(inner, flags, candidate_text)
         return bounding.height() > inner.height()
 
-    def fade_out_and_clear(self, pause_before=0, fade_duration=1500, on_finished=None):
+    def fade_out_and_clear(self, pause_before=0, fade_duration=1000, on_finished=None):
         if self._fading:
             return
         self._fading = True
