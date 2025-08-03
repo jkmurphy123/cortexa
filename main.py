@@ -66,6 +66,7 @@ def pick_topic_via_llm(config, llm_pipeline):
     )
     prompt = f"{seed}\n\nRespond with a concise topic phrase only."
     raw = llm_pipeline.generate(prompt)
+    print(f"[DEBUG topic] raw llm output: {raw}")
     topic = sanitize_topic(raw)
     if not topic:
         return "the meaning of nostalgia"
