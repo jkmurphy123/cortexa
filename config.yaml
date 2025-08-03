@@ -1,3 +1,6 @@
+screen_width: 1024
+screen_height: 768
+
 personalities:
   - name: detective_squirrel
     display_name: "Detective Squirrel"

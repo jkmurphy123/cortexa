@@ -143,8 +143,11 @@ def main():
     )
 
     app = QApplication(sys.argv)
+    screen_width = config.get("screen_width", 1024)
+    screen_height = config.get("screen_height", 768)
     images_dir = config.get("ui", {}).get("images_dir", "ui/images")
-    window = MainWindow(personality, topic, images_dir=images_dir)
+
+    window = MainWindow(personality, topic, images_dir=images_dir, screen_width=screen_width, screen_height=screen_height)
     window.showFullScreen()
 
     # Dispatcher and its slot

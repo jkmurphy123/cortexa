@@ -15,6 +15,7 @@ from PyQt6.QtCore import (
     QTimer,
     QPropertyAnimation,
     QEasingCurve,
+    QSize,
 )
 
 
@@ -110,13 +111,14 @@ class SpeechBalloonWidget(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, personality, topic, images_dir=None, on_ready_callback=None):
+    def __init__(self, personality, topic, images_dir=None, screen_width=1024, screen_height=768, on_ready_callback=None):
         super().__init__()
         self.setWindowTitle("Personality Streamer")
         self.personality = personality or {}
         self.topic = topic
         self.on_ready_callback = on_ready_callback
         self.images_dir = Path(images_dir) if images_dir else None
+        self.screen_size = QSize(screen_width, screen_height)
 
         self._background_pixmap = None
         self._raw_avatar_pixmap = None
@@ -132,10 +134,10 @@ class MainWindow(QMainWindow):
 
         # Speech balloon widget (fixed size from spec)
         spec = self.personality.get("speech_balloon", {})
-        balloon_w = spec.get("width", 400) + 0  # no extra padding here; spec includes desired size
-        balloon_h = spec.get("height", 250) + 0
+        balloon_w = spec.get("width", 400)
+        balloon_h = spec.get("height", 250)
         self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
-        self.balloon_widget.setFixedSize(balloon_w + 16, balloon_h + 16)  # give small margin
+        self.balloon_widget.setFixedSize(balloon_w + 16, balloon_h + 16)
         self.layout.addWidget(self.balloon_widget, stretch=1)
 
         # Typing indicator
@@ -147,7 +149,8 @@ class MainWindow(QMainWindow):
         # Load avatar image (background)
         self.load_avatar(self.personality.get("image_file_name"))
 
-        # Fullscreen
+        # Initial window size from config before going fullscreen
+        self.resize(self.screen_size)
         self.showFullScreen()
         self.balloon_widget.raise_()
         self.typing_label.raise_()
@@ -186,12 +189,12 @@ class MainWindow(QMainWindow):
     def _rescale_background(self):
         if not self._raw_avatar_pixmap:
             return
-        window_size = self.size()
-        if window_size.width() <= 0 or window_size.height() <= 0:
+        # Scale once to the configured screen size (not dynamic resizing)
+        target = self.screen_size
+        if target.width() <= 0 or target.height() <= 0:
             return
-        # scale once to cover full screen, cropping if needed
         scaled = self._raw_avatar_pixmap.scaled(
-            window_size,
+            target,
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
@@ -234,7 +237,6 @@ class MainWindow(QMainWindow):
 
             step()
 
-        # Overflow logic: pause 60s if appending would overflow
         if self.balloon_widget.would_overflow(candidate_full):
             def after_fade():
                 proceed_with_chunk(chunk)
