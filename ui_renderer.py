@@ -7,14 +7,21 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QGraphicsOpacityEffect,
 )
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QTextOption
-from PyQt6.QtCore import Qt, QRect, QRectF, QTimer
-from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QTextOption, QFontMetrics
+from PyQt6.QtCore import (
+    Qt,
+    QRect,
+    QRectF,
+    QTimer,
+    QPropertyAnimation,
+    QEasingCurve,
+)
+
 
 class SpeechBalloonWidget(QWidget):
     def __init__(self, balloon_spec, parent=None):
         super().__init__(parent)
-        self.balloon_spec = balloon_spec
+        self.balloon_spec = balloon_spec or {}
         self.text = ""
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
@@ -28,7 +35,6 @@ class SpeechBalloonWidget(QWidget):
         self._fading = False
 
     def set_text(self, new_text):
-        # Immediately set text (no fade) unless in fade process
         self.text = new_text
         self.effect.setOpacity(1.0)
         self.update()
@@ -41,7 +47,6 @@ class SpeechBalloonWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # draw balloon background
         rect = QRect(
             self.balloon_spec.get("x_pos", 100),
             self.balloon_spec.get("y_pos", 50),
@@ -52,7 +57,6 @@ class SpeechBalloonWidget(QWidget):
         painter.setPen(QColor(50, 50, 50))
         painter.drawRoundedRect(rect, 12, 12)
 
-        # draw text inside with wrapping
         painter.setFont(self.font)
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         painter.setPen(QColor(20, 20, 20))
@@ -62,7 +66,6 @@ class SpeechBalloonWidget(QWidget):
         painter.drawText(QRectF(inner), self.text, option)
 
     def would_overflow(self, candidate_text):
-        """Return True if candidate_text would overflow the balloon area."""
         rect = QRect(
             self.balloon_spec.get("x_pos", 100),
             self.balloon_spec.get("y_pos", 50),
@@ -71,7 +74,6 @@ class SpeechBalloonWidget(QWidget):
         )
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         metrics = QFontMetrics(self.font)
-        # Use boundingRect with word wrap to measure height
         bounding = metrics.boundingRect(
             QRectF(inner),
             Qt.TextFlag.TextWordWrap,
@@ -81,7 +83,7 @@ class SpeechBalloonWidget(QWidget):
 
     def fade_out_and_clear(self, pause_before=0, fade_duration=1500, on_finished=None):
         if self._fading:
-            return  # already fading
+            return
         self._fading = True
 
         def do_fade():
@@ -106,20 +108,21 @@ class SpeechBalloonWidget(QWidget):
         else:
             do_fade()
 
+
 class MainWindow(QMainWindow):
     def __init__(self, personality, topic, images_dir=None, on_ready_callback=None):
         super().__init__()
         self.setWindowTitle("Personality Streamer")
-        self.personality = personality
+        self.personality = personality or {}
         self.topic = topic
         self.on_ready_callback = on_ready_callback
         self.images_dir = Path(images_dir) if images_dir else None
 
-        # Will hold scaled background
         self._background_pixmap = None
         self._raw_avatar_pixmap = None
+        self._background_scaled_done = False
 
-        # Central widget (empty, painting happens in paintEvent)
+        # Central setup
         central = QWidget()
         self.setCentralWidget(central)
         self.layout = QVBoxLayout()
@@ -127,25 +130,33 @@ class MainWindow(QMainWindow):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        # Speech balloon overlay (overlayed via stacking: added after stretch)
-        self.balloon_widget = SpeechBalloonWidget(personality.get("speech_balloon", {}), parent=self)
-        self.balloon_widget.setFixedSize(1000, 800)  # will be updated if needed
+        # Speech balloon widget (fixed size from spec)
+        spec = self.personality.get("speech_balloon", {})
+        balloon_w = spec.get("width", 400) + 0  # no extra padding here; spec includes desired size
+        balloon_h = spec.get("height", 250) + 0
+        self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
+        self.balloon_widget.setFixedSize(balloon_w + 16, balloon_h + 16)  # give small margin
         self.layout.addWidget(self.balloon_widget, stretch=1)
 
-        # Typing indicator (overlayed beneath balloon)
+        # Typing indicator
         self.typing_label = QLabel("")
         self.typing_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.typing_label.setStyleSheet("color: white; font-size: 16px;")
         self.layout.addWidget(self.typing_label, stretch=0)
 
-        # Load avatar image as background
-        self.load_avatar(personality.get("image_file_name"))
+        # Load avatar image (background)
+        self.load_avatar(self.personality.get("image_file_name"))
 
-        # Fullscreen initial size
-        self.resize(1024, 768)
+        # Fullscreen
         self.showFullScreen()
         self.balloon_widget.raise_()
         self.typing_label.raise_()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._background_scaled_done:
+            self._rescale_background()
+            self._background_scaled_done = True
 
     def load_avatar(self, image_file):
         if not image_file:
@@ -163,44 +174,32 @@ class MainWindow(QMainWindow):
             if self.images_dir:
                 candidates.append(base_dir / self.images_dir / image_file)
 
-        pix = None
         for p in candidates:
             if p.exists():
                 pix = QPixmap(str(p))
-                break
+                if not pix.isNull():
+                    self._raw_avatar_pixmap = pix
+                    return
+        tried = ", ".join(str(p) for p in candidates)
+        print(f"[warning] Avatar image '{image_file}' not found. Tried: {tried}")
 
-        if pix and not pix.isNull():
-            self._raw_avatar_pixmap = pix
-            #self._rescale_background()
-        else:
-            tried = ", ".join(str(p) for p in candidates)
-            # fallback: blank background, maybe show missing
-            print(f"[warning] Avatar image '{image_file}' not found. Tried: {tried}")
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)        
-        # ensure balloon covers window if you want dynamic repositioning
-        self.balloon_widget.setFixedSize(self.size())
-
-    # def _rescale_background(self):
-    #     if not self._raw_avatar_pixmap:
-    #         return
-    #     # Cover the window: scale preserving aspect, cropping if necessary
-    #     window_size = self.size()
-    #     if window_size.width() <= 0 or window_size.height() <= 0:
-    #         return
-    #     scaled = self._raw_avatar_pixmap.scaled(
-    #         window_size,
-    #         Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-    #         Qt.TransformationMode.SmoothTransformation,
-    #     )
-    #     self._background_pixmap = scaled
+    def _rescale_background(self):
+        if not self._raw_avatar_pixmap:
+            return
+        window_size = self.size()
+        if window_size.width() <= 0 or window_size.height() <= 0:
+            return
+        # scale once to cover full screen, cropping if needed
+        scaled = self._raw_avatar_pixmap.scaled(
+            window_size,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._background_pixmap = scaled
 
     def paintEvent(self, event):
-        # Draw the background image first
         if self._background_pixmap:
             painter = QPainter(self)
-            # center-crop logic: draw so the pixmap covers full window
             pix = self._background_pixmap
             w, h = self.width(), self.height()
             pw, ph = pix.width(), pix.height()
@@ -210,26 +209,39 @@ class MainWindow(QMainWindow):
         super().paintEvent(event)
 
     def display_chunk_with_typing(self, chunk, inter_chunk_pause, on_complete=None):
-        words = chunk.split()
-        displayed = []
-        self.typing_label.setText("typing...")
-        index = 0
+        existing = self.balloon_widget.text.strip()
+        candidate_full = (existing + " " + chunk).strip() if existing else chunk.strip()
 
-        def step():
-            nonlocal index
-            if index >= len(words):
-                self.typing_label.setText("")
-                full_text = " ".join(displayed)
-                self.balloon_widget.set_text(full_text)
-                if on_complete:
-                    on_complete()
-                return
-            displayed.append(words[index])
-            self.balloon_widget.set_text(" ".join(displayed))
-            index += 1
-            QTimer.singleShot(50, step)
+        def proceed_with_chunk(text_to_show):
+            words = text_to_show.split()
+            displayed = []
+            self.typing_label.setText("typing...")
+            index = 0
 
-        step()
+            def step():
+                nonlocal index
+                if index >= len(words):
+                    self.typing_label.setText("")
+                    full_text = " ".join(displayed)
+                    self.balloon_widget.set_text(full_text)
+                    if on_complete:
+                        on_complete()
+                    return
+                displayed.append(words[index])
+                self.balloon_widget.set_text(" ".join(displayed))
+                index += 1
+                QTimer.singleShot(50, step)
+
+            step()
+
+        # Overflow logic: pause 60s if appending would overflow
+        if self.balloon_widget.would_overflow(candidate_full):
+            def after_fade():
+                proceed_with_chunk(chunk)
+
+            self.balloon_widget.fade_out_and_clear(pause_before=60, fade_duration=1500, on_finished=after_fade)
+        else:
+            proceed_with_chunk(candidate_full)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
