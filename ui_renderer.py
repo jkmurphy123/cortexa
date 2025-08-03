@@ -23,31 +23,46 @@ class SpeechBalloonWidget(QWidget):
     def __init__(self, balloon_spec, parent=None):
         super().__init__(parent)
         self.balloon_spec = balloon_spec or {}
-        self.text = ""
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
         self.font = QFont("Sans Serif", 14)
         self.padding = 8
 
-        # Opacity effect for fade
-        self.effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self.effect)
-        self.effect.setOpacity(1.0)
+        # Text label overlayed inside the balloon
+        self.text_label = QLabel(self)
+        self.text_label.setWordWrap(True)
+        self.text_label.setFont(self.font)
+        self.text_label.setStyleSheet("color: black; background: transparent;")
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.text_label.setText("")  # start empty
+
+        # Opacity effect for text (only the text fades)
+        self.text_effect = QGraphicsOpacityEffect(self.text_label)
+        self.text_label.setGraphicsEffect(self.text_effect)
+        self.text_effect.setOpacity(1.0)
         self._fading = False
+        self._current_anim = None  # keep reference so it isn't garbage-collected
+
+    @property
+    def text(self):
+        return self.text_label.text()
 
     def set_text(self, new_text):
-        self.text = new_text
-        self.effect.setOpacity(1.0)
+        self.text_label.setText(new_text)
+        self.text_effect.setOpacity(1.0)
+        self.update_label_geometry()
         self.update()
 
     def clear(self):
-        self.text = ""
+        self.text_label.setText("")
+        self.text_effect.setOpacity(1.0)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # Draw balloon background
         rect = QRect(
             self.balloon_spec.get("x_pos", 100),
             self.balloon_spec.get("y_pos", 50),
@@ -58,13 +73,19 @@ class SpeechBalloonWidget(QWidget):
         painter.setPen(QColor(50, 50, 50))
         painter.drawRoundedRect(rect, 12, 12)
 
-        painter.setFont(self.font)
-        inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
-        painter.setPen(QColor(20, 20, 20))
-        option = QTextOption()
-        option.setWrapMode(QTextOption.WrapMode.WordWrap)
+        # Ensure label is positioned correctly inside balloon
+        self.update_label_geometry()
 
-        painter.drawText(QRectF(inner), self.text, option)
+    def update_label_geometry(self):
+        rect = QRect(
+            self.balloon_spec.get("x_pos", 100),
+            self.balloon_spec.get("y_pos", 50),
+            self.balloon_spec.get("width", 400),
+            self.balloon_spec.get("height", 250),
+        )
+        inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
+        # QLabel expects QRect for geometry
+        self.text_label.setGeometry(inner)
 
     def would_overflow(self, candidate_text):
         rect = QRect(
@@ -75,9 +96,11 @@ class SpeechBalloonWidget(QWidget):
         )
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         metrics = QFontMetrics(self.font)
-        # Use boundingRect with word-wrap flag to get required height
-        flags = int(Qt.TextFlag.TextWordWrap)
-        bounding = metrics.boundingRect(inner, flags, candidate_text)
+        bounding = metrics.boundingRect(
+            QRectF(inner),
+            Qt.TextFlag.TextWordWrap,
+            candidate_text,
+        )
         return bounding.height() > inner.height()
 
     def fade_out_and_clear(self, pause_before=0, fade_duration=1500, on_finished=None):
@@ -86,7 +109,8 @@ class SpeechBalloonWidget(QWidget):
         self._fading = True
 
         def do_fade():
-            anim = QPropertyAnimation(self.effect, b"opacity", self)
+            anim = QPropertyAnimation(self.text_effect, b"opacity", self)
+            self._current_anim = anim  # hold reference
             anim.setDuration(fade_duration)
             anim.setStartValue(1.0)
             anim.setEndValue(0.0)
@@ -94,8 +118,9 @@ class SpeechBalloonWidget(QWidget):
 
             def after():
                 self.clear()
-                self.effect.setOpacity(1.0)
+                self.text_effect.setOpacity(1.0)
                 self._fading = False
+                self._current_anim = None
                 if on_finished:
                     on_finished()
 
@@ -106,7 +131,6 @@ class SpeechBalloonWidget(QWidget):
             QTimer.singleShot(pause_before * 1000, do_fade)
         else:
             do_fade()
-
 
 class MainWindow(QMainWindow):
     def __init__(self, personality, topic, images_dir=None, screen_width=1024, screen_height=768, on_ready_callback=None):
