@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self.load_avatar(personality.get("image_file_name"))
 
         # Fullscreen initial size
-        self.resize(800, 600)
+        self.resize(1024, 768)
         self.showFullScreen()
         self.balloon_widget.raise_()
         self.typing_label.raise_()
@@ -178,8 +178,7 @@ class MainWindow(QMainWindow):
             print(f"[warning] Avatar image '{image_file}' not found. Tried: {tried}")
 
     def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._rescale_background()
+        super().resizeEvent(event)        
         # ensure balloon covers window if you want dynamic repositioning
         self.balloon_widget.setFixedSize(self.size())
 
