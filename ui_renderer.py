@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
 
         if pix and not pix.isNull():
             self._raw_avatar_pixmap = pix
-            self._rescale_background()
+            #self._rescale_background()
         else:
             tried = ", ".join(str(p) for p in candidates)
             # fallback: blank background, maybe show missing
@@ -182,19 +182,19 @@ class MainWindow(QMainWindow):
         # ensure balloon covers window if you want dynamic repositioning
         self.balloon_widget.setFixedSize(self.size())
 
-    def _rescale_background(self):
-        if not self._raw_avatar_pixmap:
-            return
-        # Cover the window: scale preserving aspect, cropping if necessary
-        window_size = self.size()
-        if window_size.width() <= 0 or window_size.height() <= 0:
-            return
-        scaled = self._raw_avatar_pixmap.scaled(
-            window_size,
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._background_pixmap = scaled
+    # def _rescale_background(self):
+    #     if not self._raw_avatar_pixmap:
+    #         return
+    #     # Cover the window: scale preserving aspect, cropping if necessary
+    #     window_size = self.size()
+    #     if window_size.width() <= 0 or window_size.height() <= 0:
+    #         return
+    #     scaled = self._raw_avatar_pixmap.scaled(
+    #         window_size,
+    #         Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+    #         Qt.TransformationMode.SmoothTransformation,
+    #     )
+    #     self._background_pixmap = scaled
 
     def paintEvent(self, event):
         # Draw the background image first
