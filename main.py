@@ -58,20 +58,6 @@ def chunk_by_sentence(text: str, max_words: int):
                 current_count = 0
     yield from yield_current()
 
-# Topic generation via LLM
-def pick_topic_via_llm(config, llm_pipeline):
-    seed = config.get("topics", {}).get(
-        "llm_topic_seed",
-        "Give me a concise, interesting topic to explore in a stream of consciousness style. Respond with just the topic phrase."
-    )
-    prompt = f"{seed}\n\nRespond with a concise topic phrase only."
-    raw = llm_pipeline.generate(prompt)
-    print(f"[DEBUG topic] raw llm output: {raw}")
-    topic = sanitize_topic(raw)
-    if not topic:
-        return "the meaning of nostalgia"
-    return topic
-
 def sanitize_topic(raw: str) -> str:
     lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
     if not lines:
