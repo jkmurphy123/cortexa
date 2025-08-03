@@ -201,6 +201,7 @@ class MainWindow(QMainWindow):
     def paintEvent(self, event):
         if self._background_pixmap:
             painter = QPainter(self)
+            painter.setPen(QColor(0, 0, 0))  # pure black
             pix = self._background_pixmap
             w, h = self.width(), self.height()
             pw, ph = pix.width(), pix.height()
