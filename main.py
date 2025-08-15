@@ -74,18 +74,42 @@ def setup_logger(log_dir):
     return logger
 
 def build_prompt(personality, topic, history_chunks, config):
-    prefix = personality.get("prompt_prefix", "").strip()
-    base = f"{prefix}\n\nTopic: {topic}\n\n"
-    if not history_chunks:
-        base += "Begin a stream of consciousness exploring the topic. Let thoughts flow, include associations and mild tangents."
-    else:
-        context = "\n\n".join(history_chunks)
-        base += (
-            "Continue the stream of consciousness. Previous few thoughts:\n"
-            f"{context}\n\n"
-            "Let your mind drift naturally, staying in character, and explore related ideas."
-        )
-    return base.strip()
+    """Strong persona anchoring + few-shot examples + brief reminder each turn."""
+    persona = (personality.get("prompt_persona") or "").strip()
+    style_rules = personality.get("style_rules", [])
+    examples = personality.get("examples", [])
+    display_name = personality.get("display_name", personality.get("name", "Persona"))
+
+    rules_block = ""
+    if style_rules:
+        rules_block = "Style rules:\n" + "\n".join(f"- {r}" for r in style_rules) + "\n"
+
+    examples_block = ""
+    if examples:
+        # Keep examples short; 1–2 is plenty
+        few = examples[:2]
+        examples_block = "Examples:\n" + "\n".join(f"- {e}" for e in few) + "\n"
+
+    # Keep history short and useful; last 2 chunks is usually enough
+    short_history = "\n\n".join(history_chunks[-2:]) if history_chunks else ""
+
+    # Brief per-turn reminder to reduce drift
+    reminder = f"Reminder: stay fully in character as {display_name}. No instructions, no meta, no role labels."
+
+    parts = [
+        f"Persona:\n{persona}\n",
+        rules_block,
+        examples_block,
+        f"Topic: {topic}",
+        (f"Previous thoughts (for continuity):\n{short_history}" if short_history else ""),
+        reminder,
+        "Task: Continue a stream-of-consciousness monologue about the topic. Keep it focused, natural, and in character.",
+        "Begin:"
+    ]
+
+    # Join while skipping empty pieces
+    prompt = "\n\n".join(p for p in parts if p.strip())
+    return prompt
 
 def maybe_inject_tangent(chunk_count, drift_interval, config):
     if drift_interval and chunk_count > 0 and chunk_count % drift_interval == 0:
