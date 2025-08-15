@@ -68,13 +68,15 @@ class SpeechBalloonWidget(QWidget):
         radius = self.balloon_spec.get("border_radius", 12)
         border_w = self.balloon_spec.get("border_width", 1)
         border_color = QColor(self.balloon_spec.get("border_color", "#323232"))
-        bg_color = QColor(self.balloon_spec.get("background_color", "#ffffffcc"))
+        bg_color = QColor(self.balloon_spec.get("background_color", "#ffffffff"))
 
         painter.setBrush(bg_color)
-        pen = painter.pen()
-        pen.setColor(border_color)
-        pen.setWidth(border_w)
-        painter.setPen(pen)
+        #pen = painter.pen()
+        #pen.setColor(border_color)
+        #pen.setWidth(border_w)
+        #painter.setPen(pen)
+        painter.setPen(Qt.NoPen)
+
         painter.drawRoundedRect(rect, radius, radius)
 
         self.update_label_geometry()  # keep
@@ -185,7 +187,7 @@ class MainWindow(QMainWindow):
         x = geo.x() + (geo.width() - self.width()) // 2
         y = geo.y() + (geo.height() - self.height()) // 2
         self.move(x, y)
-        
+
     def showEvent(self, event):
         super().showEvent(event)
         if not self._background_scaled_done:
