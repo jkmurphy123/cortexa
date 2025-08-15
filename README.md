@@ -13,3 +13,9 @@ source llm_env/bin/activate
 cd cortexa
 
 python main.py
+
+to test connectivity
+
+# (activate your venv first)
+python test_llm.py --model /path/to/your/model.gguf --prompt "Say 'It works.' then describe one fun fact about acorns." --n-predict 64 --temp 0.7 --top-p 0.9 --ctx 2048 --verbose
+
