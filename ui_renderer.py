@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication,
     QLabel,
     QWidget,
@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QGraphicsOpacityEffect,
 )
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QTextOption, QFontMetrics
-from PyQt6.QtCore import (
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics
+from PyQt5.QtCore import (
     Qt,
     QRect,
     QRectF,
@@ -23,25 +23,25 @@ class SpeechBalloonWidget(QWidget):
     def __init__(self, balloon_spec, parent=None):
         super().__init__(parent)
         self.balloon_spec = balloon_spec or {}
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self.font = QFont("Sans Serif", 14)
         self.padding = 8
 
-        # Text label overlayed inside the balloon
+        # Text label (fades independently of balloon bg)
         self.text_label = QLabel(self)
         self.text_label.setWordWrap(True)
         self.text_label.setFont(self.font)
         self.text_label.setStyleSheet("color: black; background: transparent;")
-        self.text_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
-        self.text_label.setText("")  # start empty
+        self.text_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        self.text_label.setText("")
 
-        # Opacity effect for text (only the text fades)
+        # Opacity effect for the text only
         self.text_effect = QGraphicsOpacityEffect(self.text_label)
         self.text_label.setGraphicsEffect(self.text_effect)
         self.text_effect.setOpacity(1.0)
         self._fading = False
-        self._current_anim = None  # keep reference so it isn't garbage-collected
+        self._current_anim = None
 
     @property
     def text(self):
@@ -60,19 +60,29 @@ class SpeechBalloonWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)
 
-        # Draw balloon background
         rect = QRect(
             self.balloon_spec.get("x_pos", 100),
             self.balloon_spec.get("y_pos", 50),
             self.balloon_spec.get("width", 400),
             self.balloon_spec.get("height", 250),
         )
-        painter.setBrush(QColor(255, 255, 255, 230))
-        painter.setPen(QColor(50, 50, 50))
 
-        # Ensure label is positioned correctly inside balloon
+        # Balloon styling (configurable if you want later)
+        radius = self.balloon_spec.get("border_radius", 12)
+        border_w = self.balloon_spec.get("border_width", 1)
+        border_color = QColor(self.balloon_spec.get("border_color", "#323232"))
+        bg_color = QColor(self.balloon_spec.get("background_color", "#ffffffcc"))
+
+        painter.setBrush(bg_color)
+        pen = painter.pen()
+        pen.setColor(border_color)
+        pen.setWidth(border_w)
+        painter.setPen(pen)
+        painter.drawRoundedRect(rect, radius, radius)
+
+        # Keep label aligned with inner rect
         self.update_label_geometry()
 
     def update_label_geometry(self):
@@ -83,7 +93,6 @@ class SpeechBalloonWidget(QWidget):
             self.balloon_spec.get("height", 250),
         )
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
-        # QLabel expects QRect for geometry
         self.text_label.setGeometry(inner)
 
     def would_overflow(self, candidate_text):
@@ -95,23 +104,22 @@ class SpeechBalloonWidget(QWidget):
         )
         inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
         metrics = QFontMetrics(self.font)
-        # Use boundingRect with word-wrap flag to get required height
-        flags = int(Qt.TextFlag.TextWordWrap)
-        bounding = metrics.boundingRect(inner, flags, candidate_text)
+        # PyQt5: pass QRect + flags + text
+        bounding = metrics.boundingRect(inner, Qt.TextWordWrap, candidate_text)
         return bounding.height() > inner.height()
 
-    def fade_out_and_clear(self, pause_before=0, fade_duration=1000, on_finished=None):
+    def fade_out_and_clear(self, pause_before=0, fade_duration=1500, on_finished=None):
         if self._fading:
             return
         self._fading = True
 
         def do_fade():
             anim = QPropertyAnimation(self.text_effect, b"opacity", self)
-            self._current_anim = anim  # hold reference
+            self._current_anim = anim
             anim.setDuration(fade_duration)
             anim.setStartValue(1.0)
             anim.setEndValue(0.0)
-            anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            anim.setEasingCurve(QEasingCurve.InOutQuad)
 
             def after():
                 self.clear()
@@ -125,9 +133,10 @@ class SpeechBalloonWidget(QWidget):
             anim.start()
 
         if pause_before > 0:
-            QTimer.singleShot(pause_before * 1000, do_fade)
+            QTimer.singleShot(int(pause_before * 1000), do_fade)
         else:
             do_fade()
+
 
 class MainWindow(QMainWindow):
     def __init__(self, personality, topic, images_dir=None, screen_width=1024, screen_height=768, on_ready_callback=None):
@@ -143,36 +152,38 @@ class MainWindow(QMainWindow):
         self._raw_avatar_pixmap = None
         self._background_scaled_done = False
 
-        # Central setup
+        # Central container (we paint bg in window, overlays sit above)
         central = QWidget()
         self.setCentralWidget(central)
-        self.layout = QVBoxLayout()
-        central.setLayout(self.layout)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Speech balloon widget (fixed size from spec)
+        # Balloon overlay (we'll parent it to the window, not the layout)
         spec = self.personality.get("speech_balloon", {})
         balloon_w = spec.get("width", 400)
         balloon_h = spec.get("height", 250)
+        x = spec.get("x_pos", 100)
+        y = spec.get("y_pos", 50)
+
         self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
-        self.balloon_widget.setFixedSize(balloon_w * 2, balloon_h * 2)  #temp
-        self.layout.addWidget(self.balloon_widget, stretch=1)
+        self.balloon_widget.setFixedSize(int(balloon_w), int(balloon_h))
+        self.balloon_widget.move(int(x), int(y))
+        self.balloon_widget.show()
+        self.balloon_widget.raise_()
 
-        # Typing indicator
+        # Typing indicator (in layout, centered)
         self.typing_label = QLabel("")
-        self.typing_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.typing_label.setStyleSheet("color: white; font-size: 16px;")
-        self.layout.addWidget(self.typing_label, stretch=0)
+        self.typing_label.setAlignment(Qt.AlignCenter)
+        self.typing_label.setStyleSheet("color: black; font-size: 16px;")
+        layout.addWidget(self.typing_label, 0)
 
-        # Load avatar image (background)
+        # Load avatar (background)
         self.load_avatar(self.personality.get("image_file_name"))
 
-        # Initial window size from config before going fullscreen
+        # Initial size from config, then fullscreen
         self.resize(self.screen_size)
         self.showFullScreen()
-        self.balloon_widget.raise_()
-        self.typing_label.raise_()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -183,11 +194,10 @@ class MainWindow(QMainWindow):
     def load_avatar(self, image_file):
         if not image_file:
             return
-
         candidates = []
-        img_path = Path(image_file)
-        if img_path.is_absolute():
-            candidates.append(img_path)
+        p = Path(image_file)
+        if p.is_absolute():
+            candidates.append(p)
         else:
             candidates.append(Path(image_file))
             if self.images_dir:
@@ -196,33 +206,29 @@ class MainWindow(QMainWindow):
             if self.images_dir:
                 candidates.append(base_dir / self.images_dir / image_file)
 
-        for p in candidates:
-            if p.exists():
-                pix = QPixmap(str(p))
+        for c in candidates:
+            if c.exists():
+                pix = QPixmap(str(c))
                 if not pix.isNull():
                     self._raw_avatar_pixmap = pix
                     return
-        tried = ", ".join(str(p) for p in candidates)
-        print(f"[warning] Avatar image '{image_file}' not found. Tried: {tried}")
+        print(f"[warning] Avatar '{image_file}' not found. Tried: {', '.join(map(str, candidates))}")
 
     def _rescale_background(self):
         if not self._raw_avatar_pixmap:
             return
-        # Scale once to the configured screen size (not dynamic resizing)
         target = self.screen_size
         if target.width() <= 0 or target.height() <= 0:
             return
-        scaled = self._raw_avatar_pixmap.scaled(
+        self._background_pixmap = self._raw_avatar_pixmap.scaled(
             target,
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-            Qt.TransformationMode.SmoothTransformation,
+            Qt.KeepAspectRatioByExpanding,
+            Qt.SmoothTransformation,
         )
-        self._background_pixmap = scaled
 
     def paintEvent(self, event):
         if self._background_pixmap:
             painter = QPainter(self)
-            painter.setPen(QColor(0, 0, 0))  # pure black
             pix = self._background_pixmap
             w, h = self.width(), self.height()
             pw, ph = pix.width(), pix.height()
@@ -247,8 +253,6 @@ class MainWindow(QMainWindow):
                     self.typing_label.setText("")
                     full_text = " ".join(displayed)
                     self.balloon_widget.set_text(full_text)
-                    self.balloon_widget.raise_()
-                    self.balloon_widget.update()
                     if on_complete:
                         on_complete()
                     return
@@ -262,18 +266,19 @@ class MainWindow(QMainWindow):
         if self.balloon_widget.would_overflow(candidate_full):
             def after_fade():
                 proceed_with_chunk(chunk)
-
-            self.balloon_widget.fade_out_and_clear(pause_before=45, fade_duration=1000, on_finished=after_fade)
+            self.balloon_widget.fade_out_and_clear(
+                pause_before=60, fade_duration=1500, on_finished=after_fade
+            )
         else:
             proceed_with_chunk(candidate_full)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Return:
+        if event.key() == Qt.Key_Escape:
             if self.isFullScreen():
                 self.showNormal()
             else:
                 self.close()
-        elif event.key() == Qt.Key.Key_Q and event.modifiers() & Qt.KeyboardModifier.Control:
+        elif (event.key() == Qt.Key_Q) and (event.modifiers() & Qt.ControlModifier):
             self.close()
         else:
             super().keyPressEvent(event)
