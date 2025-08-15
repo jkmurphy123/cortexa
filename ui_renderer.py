@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QGraphicsOpacityEffect,
 )
-from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics,QGuiApplication
 from PyQt5.QtCore import (
     Qt,
     QRect,
@@ -121,9 +121,18 @@ class SpeechBalloonWidget(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, personality, topic, images_dir=None, screen_width=1024, screen_height=768, on_ready_callback=None):
+    def __init__(self, personality, topic, images_dir=None,screen_width=1024, screen_height=768, on_ready_callback=None):
         super().__init__()
+
+        self.setFixedSize(screen_width, screen_height)        
         self.setWindowTitle("Personality Streamer")
+
+        # Center the window on screen
+        screen = QGuiApplication.primaryScreen().geometry()
+        x = (screen.width() - screen_width) // 2
+        y = (screen.height() - screen_height) // 2
+        self.move(x, y)
+
         self.personality = personality or {}
         self.topic = topic
         self.on_ready_callback = on_ready_callback
@@ -165,7 +174,7 @@ class MainWindow(QMainWindow):
 
         # Initial size from config, then fullscreen
         self.resize(self.screen_size)
-        self.showFullScreen()
+        self.window.show()
 
     def showEvent(self, event):
         super().showEvent(event)

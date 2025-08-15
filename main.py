@@ -180,7 +180,7 @@ def main():
         screen_width=screen_width,
         screen_height=screen_height,
     )
-    window.showFullScreen()
+    window.show()
 
     dispatcher = ChunkDispatcher()
     def handle_chunk(chunk, done_event):
