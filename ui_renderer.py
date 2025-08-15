@@ -62,14 +62,9 @@ class SpeechBalloonWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect = QRect(
-            self.balloon_spec.get("x_pos", 100),
-            self.balloon_spec.get("y_pos", 50),
-            self.balloon_spec.get("width", 400),
-            self.balloon_spec.get("height", 250),
-        )
+        # Use widget-local coordinates
+        rect = self.rect()  # QRect(0, 0, self.width(), self.height())
 
-        # Balloon styling (configurable if you want later)
         radius = self.balloon_spec.get("border_radius", 12)
         border_w = self.balloon_spec.get("border_width", 1)
         border_color = QColor(self.balloon_spec.get("border_color", "#323232"))
@@ -82,29 +77,16 @@ class SpeechBalloonWidget(QWidget):
         painter.setPen(pen)
         painter.drawRoundedRect(rect, radius, radius)
 
-        # Keep label aligned with inner rect
-        self.update_label_geometry()
+        self.update_label_geometry()  # keep
 
     def update_label_geometry(self):
-        rect = QRect(
-            self.balloon_spec.get("x_pos", 100),
-            self.balloon_spec.get("y_pos", 50),
-            self.balloon_spec.get("width", 400),
-            self.balloon_spec.get("height", 250),
-        )
-        inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
+        # Layout text within the widget, not absolute window coords
+        inner = self.rect().adjusted(self.padding, self.padding, -self.padding, -self.padding)
         self.text_label.setGeometry(inner)
 
     def would_overflow(self, candidate_text):
-        rect = QRect(
-            self.balloon_spec.get("x_pos", 100),
-            self.balloon_spec.get("y_pos", 50),
-            self.balloon_spec.get("width", 400),
-            self.balloon_spec.get("height", 250),
-        )
-        inner = rect.adjusted(self.padding, self.padding, -self.padding, -self.padding)
+        inner = self.rect().adjusted(self.padding, self.padding, -self.padding, -self.padding)
         metrics = QFontMetrics(self.font)
-        # PyQt5: pass QRect + flags + text
         bounding = metrics.boundingRect(inner, Qt.TextWordWrap, candidate_text)
         return bounding.height() > inner.height()
 
@@ -161,14 +143,14 @@ class MainWindow(QMainWindow):
 
         # Balloon overlay (we'll parent it to the window, not the layout)
         spec = self.personality.get("speech_balloon", {})
-        balloon_w = spec.get("width", 400)
-        balloon_h = spec.get("height", 250)
-        x = spec.get("x_pos", 100)
-        y = spec.get("y_pos", 50)
+        balloon_w = int(spec.get("width", 400))
+        balloon_h = int(spec.get("height", 250))
+        x = int(spec.get("x_pos", 100))
+        y = int(spec.get("y_pos", 50))
 
         self.balloon_widget = SpeechBalloonWidget(spec, parent=self)
-        self.balloon_widget.setFixedSize(int(balloon_w), int(balloon_h))
-        self.balloon_widget.move(int(x), int(y))
+        self.balloon_widget.setFixedSize(balloon_w, balloon_h)
+        self.balloon_widget.move(x, y)
         self.balloon_widget.show()
         self.balloon_widget.raise_()
 
