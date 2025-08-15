@@ -172,10 +172,20 @@ class MainWindow(QMainWindow):
         # Load avatar (background)
         self.load_avatar(self.personality.get("image_file_name"))
 
-        # Initial size from config, then fullscreen
-        self.resize(self.screen_size)
-        self.window.show()
+        # Fixed window size from config, then center + show
+        self.setFixedSize(self.screen_size)
+        self._center_on_screen()
+        self.show()  # windowed, not fullscreen
 
+    def _center_on_screen(self):
+        screen = QGuiApplication.primaryScreen()
+        if not screen:
+            return
+        geo = screen.availableGeometry()
+        x = geo.x() + (geo.width() - self.width()) // 2
+        y = geo.y() + (geo.height() - self.height()) // 2
+        self.move(x, y)
+        
     def showEvent(self, event):
         super().showEvent(event)
         if not self._background_scaled_done:
