@@ -117,7 +117,7 @@ class SpeechBalloonWidget(QWidget):
             anim.start()
 
         if pause_before > 0:
-            QTimer.singleShot(int(pause_before * 1000), do_fade)
+            QTimer.singleShot(int(pause_before * 500), do_fade)
         else:
             do_fade()
 
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
             def after_fade():
                 proceed_with_chunk(chunk)
             self.balloon_widget.fade_out_and_clear(
-                pause_before=60, fade_duration=1500, on_finished=after_fade
+                pause_before=60, fade_duration=800, on_finished=after_fade
             )
         else:
             proceed_with_chunk(candidate_full)

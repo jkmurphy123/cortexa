@@ -47,6 +47,69 @@ def chunk_by_sentence(text: str, max_words: int):
                 current_chunk, current_count = [], 0
     yield from flush()
 
+# ----- CLEANING: make sure only the assistant's reply is displayed -----
+
+_LABEL_LINE = re.compile(
+    r'^\s*(Persona:|Style rules:|Examples:|Topic:|Previous thoughts:|Reminder:|Task:|Begin:)\b',
+    re.IGNORECASE
+)
+_IM_MARKERS = re.compile(r'<\|im_(?:start|end)\|>|<\|im_start\|assistant>', re.IGNORECASE)
+
+def _strip_label_lines(text: str) -> str:
+    lines = []
+    for line in text.splitlines():
+        if _LABEL_LINE.search(line):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+def clean_llm_output(raw: str) -> str:
+    """
+    Remove any echoed setup/instructions and return only the assistant's content.
+    Rules:
+      1) If <<<START>>> markers are present, extract between <<<START>>> and <<<END>>> (or end of text).
+      2) Otherwise strip common role/label lines and obvious system tokens.
+      3) Trim whitespace and surrounding quotes.
+    """
+    if not raw:
+        return ""
+
+    text = raw
+
+    # 1) Reply marker extraction
+    start_tag = "<<<START>>>"
+    end_tag = "<<<END>>>"
+    if start_tag in text:
+        start_idx = text.find(start_tag) + len(start_tag)
+        end_idx = text.find(end_tag, start_idx)
+        if end_idx == -1:
+            end_idx = len(text)
+        text = text[start_idx:end_idx]
+
+    # 2) Remove IM/system markers
+    text = _IM_MARKERS.sub("", text)
+
+    # 3) Drop any prompt label lines if they were echoed
+    text = _strip_label_lines(text)
+
+    # 4) Remove common instruction-y leakage
+    forbid = [
+        "Do not repeat the previous sentence",
+        "Make sure to keep the flow of the conversation flowing smoothly and to the point.",
+    ]
+    for f in forbid:
+        text = text.replace(f, "")
+
+    # 5) Strip surrounding quotes and tidy whitespace
+    text = text.strip().strip('"\'')
+
+    # 6) Final collapse of excessive blank lines
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+
+    return text
+
+# -------------------- Config / logging helpers --------------------
+
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -67,7 +130,13 @@ def setup_logger(log_dir):
     logger.addHandler(ch)
     return logger
 
+# -------------------- Prompt construction --------------------
+
 def build_prompt(personality, topic, history_chunks, config):
+    """
+    Persona-anchored prompt with gentle instruction to place the reply between <<<START>>> and <<<END>>>.
+    Even if the model ignores markers, we still clean echoed labels later.
+    """
     persona = (personality.get("prompt_persona") or personality.get("prompt_prefix", "")).strip()
     style_rules = personality.get("style_rules", [])
     examples = personality.get("examples", [])
@@ -85,8 +154,11 @@ def build_prompt(personality, topic, history_chunks, config):
         f"Topic: {topic}",
         (f"Previous thoughts:\n{short_history}" if short_history else ""),
         reminder,
+        # This line helps us extract only the reply if the model complies.
         "Task: Continue a stream-of-consciousness monologue about the topic, in character.",
+        "Write your reply between <<<START>>> and <<<END>>> only.",
         "Begin:",
+        "<<<START>>>",
     ]
     return "\n\n".join(p for p in parts if p.strip())
 
@@ -94,6 +166,8 @@ def maybe_inject_tangent(chunk_count, drift_interval, config):
     if drift_interval and chunk_count > 0 and chunk_count % drift_interval == 0:
         return config.get("streaming", {}).get("tangent_prompt", "")
     return None
+
+# -------------------- Backend generation loop --------------------
 
 def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher):
     s = config.get("streaming", {})
@@ -112,8 +186,11 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
     while not stop_event.is_set() and iteration < 8:
         iteration += 1
         tangent = maybe_inject_tangent(chunk_counter, drift_interval, config)
-        prompt = (f"{tangent}\n\nThen continue in character about {topic}."
-                  if tangent else build_prompt(personality, topic, history, config))
+        if tangent:
+            # If you want markers even in tangent prompts, append <<<START>>> again:
+            prompt = f"{tangent}\n\nThen continue in character about {topic}.\n<<<START>>>"
+        else:
+            prompt = build_prompt(personality, topic, history, config)
 
         if log_cfg.get("include_full_prompts", False):
             logger.debug(f"Prompt iteration {iteration}:\n{prompt}")
@@ -123,7 +200,13 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
             logger.warning("Empty LLM output; skipping iteration.")
             continue
 
-        for chunk in chunk_by_sentence(raw_output, max_words):
+        # Clean any echoed instructions/persona text BEFORE chunking
+        cleaned = clean_llm_output(raw_output)
+        if not cleaned:
+            logger.warning("All content cleaned out (likely only instructions were echoed); skipping.")
+            continue
+
+        for chunk in chunk_by_sentence(cleaned, max_words):
             chunk_counter += 1
             done = threading.Event()
             dispatcher.chunk_signal.emit(chunk, done)
@@ -136,8 +219,10 @@ def backend_loop(personality, topic, llm, config, logger, stop_event, dispatcher
 
     logger.info("Backend loop finished.")
 
+# -------------------- Entry point --------------------
+
 def main():
-    parser = argparse.ArgumentParser(description="Phase 3: GUI streamer (PyQt5)")
+    parser = argparse.ArgumentParser(description="Phase 3: GUI streamer (PyQt5, cleaned output)")
     parser.add_argument("--config", "-c", default="config.yaml")
     parser.add_argument("--model", "-m", default=None)
     args = parser.parse_args()
@@ -180,7 +265,7 @@ def main():
         screen_width=screen_width,
         screen_height=screen_height,
     )
-    window.show()
+    window.show()  # windowed (not fullscreen)
 
     dispatcher = ChunkDispatcher()
     def handle_chunk(chunk, done_event):
